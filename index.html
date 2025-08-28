@@ -24,7 +24,7 @@
     .lake{position:absolute; inset:0;}
     .water{position:absolute; left:0; right:0; top:20%; bottom:0; background:linear-gradient(180deg, var(--sea2), var(--sea1));}
     .shore{position:absolute; left:0; right:0; bottom:0; height:14%; background:linear-gradient(180deg,#3c2b1a,#24190f);}
-    .ripples{position:absolute; inset:0; pointer-events:auto; z-index:20} /* allow clicks inside bubble */
+    .ripples{position:absolute; inset:0; pointer-events:none; z-index:20} /* прозрачно за кликове */
 
     .grid{
       position:absolute; left:6%; right:6%; top:18%; bottom:18%;
@@ -44,7 +44,7 @@
     .cell span{position:absolute; left:8px; top:6px; font-size:12px; color:var(--muted)}
     .cell b{font-size:22px; color:#fff; opacity:.9}
 
-    .overlay{position:absolute; inset:0; display:grid; place-items:center; z-index:50} /* Start always on top */
+    .overlay{position:absolute; inset:0; display:grid; place-items:center; z-index:50}
     .card{background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.18); border-radius:16px; padding:22px}
     button{cursor:pointer; border:0; border-radius:12px; padding:10px 14px; font-weight:800}
     .btn{background:var(--accent)}
@@ -55,7 +55,8 @@
     @keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
 
     .bubble{
-      position:absolute; transform:translate(-50%,-100%) scale(.92); transform-origin:50% 100%;
+      position:absolute; pointer-events:auto;
+      transform:translate(-50%,-100%) scale(.92); transform-origin:50% 100%;
       background:rgba(0,0,0,.35); border:1px solid var(--glass-b); border-radius:14px;
       padding:10px 12px; min-width:220px; z-index:15; opacity:0; animation:pop .18s ease-out forwards;
     }
@@ -82,7 +83,7 @@
       <div class="shore"></div>
     </div>
 
-    <!-- само бутон Старт -->
+    <!-- Старт -->
     <div class="overlay" id="start">
       <div class="card">
         <button class="btn" id="play" onclick="window.startGame && window.startGame()">Старт</button>
@@ -98,137 +99,31 @@
 <script>
 (() => {
   'use strict';
-
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
 
   function init(){
-    const grid = document.getElementById('grid');
-    const ripples = document.getElementById('ripples');
-    const startUI = document.getElementById('start');
-    const playBtn = document.getElementById('play');
+    const grid=document.getElementById('grid'), ripples=document.getElementById('ripples'), startUI=document.getElementById('start'), playBtn=document.getElementById('play');
 
-    // ===== Audio: single pop on reveal =====
-    let actx;
-    const ctx = () => actx || (actx = new (window.AudioContext||window.webkitAudioContext)());
-    function ensureAudio(){ try{ const a=ctx(); if(a.state==='suspended') a.resume(); }catch(e){} }
-    function popSound(){
-      ensureAudio();
-      const a=ctx(); const o=a.createOscillator(); const g=a.createGain();
-      o.type='triangle'; o.frequency.value=420; g.gain.value=0.18;
-      o.connect(g); g.connect(a.destination);
-      const t=a.currentTime; o.start(t); o.stop(t+0.12);
-      g.gain.setValueAtTime(0.18,t); g.gain.exponentialRampToValueAtTime(0.001, t+0.12);
-    }
+    let actx; const ctx=()=>actx||(actx=new (window.AudioContext||window.webkitAudioContext)());
+    function ensureAudio(){try{const a=ctx(); if(a.state==='suspended') a.resume();}catch(e){}}
+    function popSound(){ ensureAudio(); const a=ctx(), o=a.createOscillator(), g=a.createGain(); o.type='triangle'; o.frequency.value=420; g.gain.value=0.18; o.connect(g); g.connect(a.destination); const t=a.currentTime; o.start(t); o.stop(t+0.12); g.gain.setValueAtTime(0.18,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.12); }
 
-    // ===== Start (robust) =====
-    function startGame(){
-      if (startUI && startUI.parentNode) startUI.parentNode.removeChild(startUI); // remove overlay entirely
-      build();
-    }
-    window.startGame = startGame;
-    if (playBtn) playBtn.addEventListener('click', startGame);
-    if (startUI) startUI.addEventListener('click', (e)=>{ if(e.target===startUI) startGame(); });
-    if (!playBtn) startGame(); // fallback
+    function startGame(){ if(startUI&&startUI.parentNode) startUI.parentNode.removeChild(startUI); build(); }
+    window.startGame=startGame;
+    if(playBtn) playBtn.addEventListener('click', startGame);
 
-    // ===== Grid (near at bottom) =====
     const rows=3, cols=3; let locked=false;
-    function build(){
-      grid.innerHTML=''; let idx=1;
-      for(let r=0;r<rows;r++){
-        for(let c=0;c<cols;c++){
-          const cell=document.createElement('div'); cell.className='cell';
-          const lab=document.createElement('span');
-          const dist = r===2? 'близо' : r===1? 'средно' : 'далеч';
-          const col = c===0? 'ляво' : c===1? 'център' : 'дясно';
-          lab.textContent = `${dist} • ${col}`; cell.appendChild(lab);
-          const num=document.createElement('b'); num.textContent=idx++; cell.appendChild(num);
-          cell.addEventListener('click', ()=> cast(r,c,cell));
-          grid.appendChild(cell);
-        }
-      }
-      // safety: if for some reason cells aren't built, retry once
-      setTimeout(()=>{ if(grid.children.length<9){ console.warn('Retry grid build'); build(); } }, 120);
-    }
+    function build(){ grid.innerHTML=''; let idx=1; for(let r=0;r<rows;r++){ for(let c=0;c<cols;c++){ const cell=document.createElement('div'); cell.className='cell'; const lab=document.createElement('span'); const dist=r===2?'близо':r===1?'средно':'далеч'; const col=c===0?'ляво':c===1?'център':'дясно'; lab.textContent=`${dist} • ${col}`; cell.appendChild(lab); const num=document.createElement('b'); num.textContent=idx++; cell.appendChild(num); cell.addEventListener('click',()=>cast(r,c,cell)); grid.appendChild(cell);} } }
 
-    // ===== Model =====
-    const species = [
-      {id:'perch',   name:'Костур',     emoji:'🐟', w:[0.1,1.2],  depth:[1.0,4.0], wait:[5,40]},
-      {id:'pike',    name:'Щука',       emoji:'🦈', w:[0.8,8.0],  depth:[0.5,2.5], wait:[10,60]},
-      {id:'zander',  name:'Бяла риба',  emoji:'🐠', w:[0.7,4.5],  depth:[2.0,8.0], wait:[15,120]},
-      {id:'catfish', name:'Сом',        emoji:'🐡', w:[2.0,30.0], depth:[3.0,10.0], wait:[30,180]}
-    ];
-    // far (top), mid, near (bottom) → [perch, pike, zander, catfish]
-    const distRowWeights = [
-      [0.25, 0.20, 0.45, 0.10],
-      [0.40, 0.30, 0.25, 0.05],
-      [0.55, 0.30, 0.12, 0.03]
-    ];
+    const species=[{id:'perch',name:'Костур',emoji:'🐟',w:[0.1,1.2],depth:[1,4],wait:[5,40]},{id:'pike',name:'Щука',emoji:'🦈',w:[0.8,8],depth:[0.5,2.5],wait:[10,60]},{id:'zander',name:'Бяла риба',emoji:'🐠',w:[0.7,4.5],depth:[2,8],wait:[15,120]},{id:'catfish',name:'Сом',emoji:'🐡',w:[2,30],depth:[3,10],wait:[30,180]}];
+    const distRowWeights=[[0.25,0.2,0.45,0.1],[0.4,0.3,0.25,0.05],[0.55,0.3,0.12,0.03]];
+    const rnd=(a,b)=>Math.random()*(b-a)+a, clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), fmtWait=(s)=>s<60?`${s} сек`:`${Math.floor(s/60)} мин ${s%60? s%60+' сек':''}`, pickWeighted=(arr)=>{const x=Math.random();let acc=0;for(let i=0;i<arr.length;i++){acc+=arr[i];if(x<=acc)return i;}return arr.length-1;};
 
-    const rnd=(a,b)=>Math.random()*(b-a)+a;
-    const clamp=(v,a,b)=>Math.max(a, Math.min(b,v));
-    const fmtWait=(sec)=>{ if(sec<60) return `${sec} сек`; const m=Math.floor(sec/60), s=sec%60; return s? `${m} мин ${s} сек` : `${m} мин`; };
-    const pickWeighted=(arr)=>{ const x=Math.random(); let acc=0; for(let i=0;i<arr.length;i++){ acc+=arr[i]; if(x<=acc) return i; } return arr.length-1; };
+    function splash(x,y){const s=document.createElement('div');s.className='splash';s.style.left=`${x+grid.offsetLeft}px`;s.style.top=`${y+grid.offsetTop}px`;ripples.appendChild(s);setTimeout(()=>s.remove(),1200);}
+    function spinnerAt(x,y){const sp=document.createElement('div');sp.className='spinner';sp.style.left=`${x+grid.offsetLeft}px`;sp.style.top=`${y+grid.offsetTop}px`;ripples.appendChild(sp);return sp;}
+    function bubbleAt(x,y,f,w,d,t){const bub=document.createElement('div');bub.className='bubble';bub.style.left=`${x+grid.offsetLeft}px`;bub.style.top=`${y+grid.offsetTop-10}px`;bub.innerHTML=`<div class=\"b-title\">${f.emoji} ${f.name}</div><div class=\"b-row\"><div>Тегло:</div><div>${w.toFixed(w<1?2:1)} кг</div><div>Дълбочина:</div><div>${d.toFixed(1)} м</div><div>Чакане:</div><div>${fmtWait(t)}</div></div><div class=\"b-actions\"><button class=\"btn\" id=\"againBtn\">Играй пак</button></div>`;ripples.appendChild(bub);requestAnimationFrame(()=>{bub.style.opacity='1';});bub.querySelector('#againBtn').addEventListener('click',()=>{bub.remove();locked=false;grid.classList.remove('locked');});}
 
-    // ===== UI helpers =====
-    function splash(x,y){
-      const s=document.createElement('div'); s.className='splash';
-      s.style.left = `${x + grid.offsetLeft}px`; s.style.top = `${y + grid.offsetTop}px`;
-      ripples.appendChild(s); setTimeout(()=>s.remove(), 1200);
-    }
-    function spinnerAt(x,y){
-      const sp=document.createElement('div'); sp.className='spinner';
-      sp.style.left = `${x + grid.offsetLeft}px`; sp.style.top = `${y + grid.offsetTop}px`;
-      ripples.appendChild(sp); return sp;
-    }
-    function bubbleAt(x,y,f,weight,depth,wait){
-      const bub=document.createElement('div'); bub.className='bubble';
-      bub.style.left = `${x + grid.offsetLeft}px`; bub.style.top = `${y + grid.offsetTop - 10}px`;
-      bub.innerHTML = `
-        <div class="b-title">${f.emoji} ${f.name}</div>
-        <div class="b-row">
-          <div>Тегло:</div><div>${weight.toFixed(weight<1?2:1)} кг</div>
-          <div>Дълбочина:</div><div>${depth.toFixed(1)} м</div>
-          <div>Чакане:</div><div>${fmtWait(wait)}</div>
-        </div>
-        <div class="b-actions"><button class="btn" id="againBtn">Играй пак</button></div>`;
-      ripples.appendChild(bub);
-      requestAnimationFrame(()=>{ bub.style.opacity='1'; }); // ensure visible even if animations are blocked
-      bub.querySelector('#againBtn').addEventListener('click',()=>{ bub.remove(); locked=false; grid.classList.remove('locked'); });
-      return bub;
-    }
-
-    function cast(r,c,cell){
-      if(locked) return; locked=true; grid.classList.add('locked');
-
-      const rect = cell.getBoundingClientRect();
-      const grect = grid.getBoundingClientRect();
-      const x = rect.left + rect.width/2 - grect.left;
-      const y = rect.top + rect.height/2 - grect.top;
-
-      splash(x,y);
-
-      const fishId = pickWeighted(distRowWeights[r]); const f = species[fishId];
-      const depthAdj = r===2? -0.6 : r===1? 0 : 0.6;
-      const weight = rnd(f.w[0], f.w[1]);
-      const depth = clamp(rnd(f.depth[0], f.depth[1]) + depthAdj, 0.4, 12);
-      const wait = Math.round(rnd(f.wait[0], f.wait[1]));
-
-      const spin = spinnerAt(x,y);
-      setTimeout(()=>{
-        try{
-          spin.remove();
-          const isTrophy=(Math.random()<0.06)&&(f.id==='pike'||f.id==='catfish');
-          const W=isTrophy?weight*rnd(1.08,1.25):weight;
-          const T=isTrophy?wait+10:wait;
-          const F={...f}; if(isTrophy) F.name += ' (трофей!)';
-          popSound(); // sound exactly at pop
-          bubbleAt(x,y, F, W, depth, T);
-        }catch(err){
-          console.error('Reveal error:', err);
-          locked=false; grid.classList.remove('locked');
-        }
-      }, 650);
-    }
+    function cast(r,c,cell){ if(locked)return; locked=true; grid.classList.add('locked'); const rect=cell.getBoundingClientRect(), grect=grid.getBoundingClientRect(), x=rect.left+rect.width/2-grect.left, y=rect.top+rect.height/2-grect.top; splash(x,y); const f=species[pickWeighted(distRowWeights[r])]; const depthAdj=r===2?-0.6:r===1?0:0.6; const w=rnd(f.w[0],f.w[1]); const d=clamp(rnd(f.depth[0],f.depth[1])+depthAdj,0.4,12); const t=Math.round(rnd(f.wait[0],f.wait[1])); const spin=spinnerAt(x,y); setTimeout(()=>{spin.remove();popSound();bubbleAt(x,y,f,w,d,t);},650); }
   }
 })();
 </script>
