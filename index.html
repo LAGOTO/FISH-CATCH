@@ -24,7 +24,7 @@
     .lake{position:absolute; inset:0;}
     .water{position:absolute; left:0; right:0; top:20%; bottom:0; background:linear-gradient(180deg, var(--sea2), var(--sea1));}
     .shore{position:absolute; left:0; right:0; bottom:0; height:14%; background:linear-gradient(180deg,#3c2b1a,#24190f);}
-    .ripples{position:absolute; inset:0; pointer-events:none; z-index:20} /* прозрачно за кликове */
+    .ripples{position:absolute; inset:0; pointer-events:none; z-index:20}
 
     .grid{
       position:absolute; left:6%; right:6%; top:18%; bottom:18%;
@@ -56,6 +56,7 @@
 
     .bubble{
       position:absolute; pointer-events:auto;
+      left:50%; top:90%;
       transform:translate(-50%,-100%) scale(.92); transform-origin:50% 100%;
       background:rgba(0,0,0,.35); border:1px solid var(--glass-b); border-radius:14px;
       padding:10px 12px; min-width:220px; z-index:15; opacity:0; animation:pop .18s ease-out forwards;
@@ -65,8 +66,6 @@
     .b-title{margin:0 0 6px; font-weight:800}
     .b-actions{display:flex; gap:8px; margin-top:8px}
     @keyframes pop{from{opacity:0; transform:translate(-50%,-100%) scale(.92)} to{opacity:1; transform:translate(-50%,-100%) scale(1)}}
-
-    footer{position:absolute; inset:auto 12px 10px 12px; color:#d0e2f6; font-size:12px; display:flex; justify-content:space-between}
   </style>
 </head>
 <body>
@@ -89,11 +88,6 @@
         <button class="btn" id="play" onclick="window.startGame && window.startGame()">Старт</button>
       </div>
     </div>
-
-    <footer>
-      <div>Съвет: близките квадрати са по-плитки; далечните – по-дълбоки.</div>
-      <div>© Lago.bg</div>
-    </footer>
   </div>
 
 <script>
@@ -121,7 +115,13 @@
 
     function splash(x,y){const s=document.createElement('div');s.className='splash';s.style.left=`${x+grid.offsetLeft}px`;s.style.top=`${y+grid.offsetTop}px`;ripples.appendChild(s);setTimeout(()=>s.remove(),1200);}
     function spinnerAt(x,y){const sp=document.createElement('div');sp.className='spinner';sp.style.left=`${x+grid.offsetLeft}px`;sp.style.top=`${y+grid.offsetTop}px`;ripples.appendChild(sp);return sp;}
-    function bubbleAt(x,y,f,w,d,t){const bub=document.createElement('div');bub.className='bubble';bub.style.left=`${x+grid.offsetLeft}px`;bub.style.top=`${y+grid.offsetTop-10}px`;bub.innerHTML=`<div class=\"b-title\">${f.emoji} ${f.name}</div><div class=\"b-row\"><div>Тегло:</div><div>${w.toFixed(w<1?2:1)} кг</div><div>Дълбочина:</div><div>${d.toFixed(1)} м</div><div>Чакане:</div><div>${fmtWait(t)}</div></div><div class=\"b-actions\"><button class=\"btn\" id=\"againBtn\">Играй пак</button></div>`;ripples.appendChild(bub);requestAnimationFrame(()=>{bub.style.opacity='1';});bub.querySelector('#againBtn').addEventListener('click',()=>{bub.remove();locked=false;grid.classList.remove('locked');});}
+    function bubbleAt(x,y,f,w,d,t){
+      const bub=document.createElement('div');bub.className='bubble';
+      bub.innerHTML=`<div class=\"b-title\">${f.emoji} ${f.name}</div><div class=\"b-row\"><div>Тегло:</div><div>${w.toFixed(w<1?2:1)} кг</div><div>Дълбочина:</div><div>${d.toFixed(1)} м</div><div>Чакане:</div><div>${fmtWait(t)}</div></div><div class=\"b-actions\"><button class=\"btn\" id=\"againBtn\">Играй пак</button></div>`;
+      ripples.appendChild(bub);
+      requestAnimationFrame(()=>{bub.style.opacity='1';});
+      bub.querySelector('#againBtn').addEventListener('click',()=>{bub.remove();locked=false;grid.classList.remove('locked');});
+    }
 
     function cast(r,c,cell){ if(locked)return; locked=true; grid.classList.add('locked'); const rect=cell.getBoundingClientRect(), grect=grid.getBoundingClientRect(), x=rect.left+rect.width/2-grect.left, y=rect.top+rect.height/2-grect.top; splash(x,y); const f=species[pickWeighted(distRowWeights[r])]; const depthAdj=r===2?-0.6:r===1?0:0.6; const w=rnd(f.w[0],f.w[1]); const d=clamp(rnd(f.depth[0],f.depth[1])+depthAdj,0.4,12); const t=Math.round(rnd(f.wait[0],f.wait[1])); const spin=spinnerAt(x,y); setTimeout(()=>{spin.remove();popSound();bubbleAt(x,y,f,w,d,t);},650); }
   }
