@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lago Fishing Clicker</title>
+  <style>
+    :root{
+      --bg:#0a1b2a; --sea:#0f2740; --ui:#ffffff; --accent:#7bd389; --muted:#8fb3cc;
+    }
+    html,body{height:100%;margin:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;background:linear-gradient(#073255,#0a1b2a);color:var(--ui);display:flex;align-items:center;justify-content:center}
+    .game{width:min(1000px,96vw);height:min(600px,70vh);background:radial-gradient(circle at 50% -20%,#1e6aa8 0%, var(--sea) 60%);border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.45);position:relative;overflow:hidden}
+    canvas{position:absolute;inset:0}
+    header{position:absolute;left:12px;right:12px;top:12px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:5}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px}
+    .brand .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+    .hud{display:flex;gap:14px;align-items:center}
+    .pill{backdrop-filter: blur(6px); background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); padding:6px 10px; border-radius:999px; font-weight:600}
+    .cta{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px}
+    .card{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:20px 18px;max-width:520px}
+    .title{font-size:clamp(20px,3.5vw,28px);margin:0 0 6px}
+    .subtitle{color:#d8e7f6;margin:0 0 16px;opacity:.9}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    button{cursor:pointer;border:0;border-radius:12px;padding:10px 14px;font-weight:700}
+    .btn-primary{background:var(--accent)}
+    .btn-ghost{background:transparent;color:var(--ui);outline:1px solid rgba(255,255,255,.35)}
+    a.btn-ghost{color:inherit;text-decoration:none}
+    footer{position:absolute;bottom:8px;left:12px;right:12px;display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
+    .sr-only{position:absolute;left:-9999px}
+  </style>
+</head>
+<body>
+  <div class="game" id="game">
+    <header>
+      <div class="brand"><span class="dot"></span> Lago Fishing</div>
+      <div class="hud">
+        <div class="pill">Score: <span id="score">0</span></div>
+        <div class="pill">Time: <span id="time">30</span>s</div>
+        <div class="pill">Best: <span id="best">0</span></div>
+      </div>
+    </header>
+    <canvas id="c" width="1000" height="600" aria-label="Fishing game playfield"></canvas>
+    <div class="cta" id="start">
+      <div class="card">
+        <h1 class="title">Catch as many fish as you can in 30 seconds!</h1>
+        <p class="subtitle">Click (or tap) the fish. Avoid jellyfish (−2). Golden fish are rare and worth +5.</p>
+        <div class="row">
+          <button class="btn-primary" id="play">Start</button>
+          <button class="btn-ghost" id="how">How to play</button>
+        </div>
+      </div>
+    </div>
+    <div class="cta" id="howCard" style="display:none">
+      <div class="card">
+        <h2 class="title">How to play</h2>
+        <ul style="text-align:left;line-height:1.5;margin-top:0">
+          <li>Click/tap fish to score points.</li>
+          <li>Normal fish: +1 • Golden fish: +5 • Jellyfish: −2</li>
+          <li>Game lasts 30 seconds. Beat your personal best!</li>
+        </ul>
+        <div class="row">
+          <button class="btn-primary" id="play2">Play now</button>
+          <button class="btn-ghost" id="closeHow">Close</button>
+        </div>
+      </div>
+    </div>
+    <div class="cta" id="end" style="display:none">
+      <div class="card">
+        <h2 class="title">Time's up!</h2>
+        <p class="subtitle">Your score: <b id="finalScore">0</b> • Best: <b id="finalBest">0</b></p>
+        <div class="row">
+          <button class="btn-primary" id="again">Play again</button>
+          <a class="btn-ghost" id="share" href="#" target="_blank" rel="noopener">Share score</a>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <div>Tip: bigger fish are slower but easier to click.</div>
+      <div>© Lago.bg</div>
+    </footer>
+  </div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const timeEl = document.getElementById('time');
+  const bestEl = document.getElementById('best');
+  const startUI = document.getElementById('start');
+  const howUI = document.getElementById('howCard');
+  const endUI = document.getElementById('end');
+  const finalScore = document.getElementById('finalScore');
+  const finalBest = document.getElementById('finalBest');
+  const shareLink = document.getElementById('share');
+  const playBtns = [document.getElementById('play'), document.getElementById('play2')];
+  const closeHow = document.getElementById('closeHow');
+  const howBtn = document.getElementById('how');
+  const againBtn = document.getElementById('again');
+
+  let W = canvas.width, H = canvas.height;
+  let running = false, score = 0, timeLeft = 30, last = 0;
+  let fish = [], particles = [];
+  let best = Number(localStorage.getItem('lago_fish_best')||0);
+  bestEl.textContent = best;
+
+  function resize(){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const scale = Math.min(rect.width/1000, rect.height/600);
+    canvas.style.transformOrigin = 'top left';
+    canvas.style.transform = `scale(${scale})`;
+  }
+  addEventListener('resize', resize); setTimeout(resize, 0);
+
+  function rand(a,b){return Math.random()*(b-a)+a}
+  function pick(arr){return arr[(Math.random()*arr.length)|0]}
+
+  function spawnFish(){
+    const types = ['normal','normal','normal','jelly','gold'];
+    const type = pick(types);
+    const y = rand(80,H-80); // keep away from edges
+    const dir = Math.random()<0.5?1:-1;
+    const speed = type==='gold'? rand(1.5,2.2) : type==='jelly'? rand(0.8,1.4) : rand(1.2,2.0);
+    const size = type==='gold'? rand(22,30) : type==='jelly'? rand(16,22) : rand(18,26);
+    const x = dir>0? -50 : W+50;
+    fish.push({x,y,dir,speed,size,type,hit:false});
+  }
+
+  function drawFish(f){
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    if(f.dir<0) ctx.scale(-1,1);
+    // body
+    ctx.fillStyle = f.type==='gold'? '#ffd76b' : f.type==='jelly'? 'rgba(180,220,255,0.85)' : '#ffd1a8';
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 2;
+    if(f.type==='jelly'){
+      // jellyfish
+      ctx.beginPath();
+      ctx.ellipse(0,0,f.size*0.9,f.size*0.7,0,0,Math.PI*2);
+      ctx.fill();
+      // tentacles
+      for(let i=-2;i<=2;i++){
+        ctx.beginPath();
+        ctx.moveTo(i*5, f.size*0.6);
+        ctx.quadraticCurveTo(i*7, f.size*0.9, i*5, f.size*1.2);
+        ctx.strokeStyle = 'rgba(200,230,255,0.5)';
+        ctx.stroke();
+      }
+    } else {
+      // fish body
+      ctx.beginPath();
+      ctx.ellipse(0,0,f.size*1.2,f.size*0.7,0,0,Math.PI*2);
+      ctx.fill();
+      // tail
+      ctx.beginPath();
+      ctx.moveTo(-f.size*1.4,0);
+      ctx.lineTo(-f.size*1.9, f.size*0.5);
+      ctx.lineTo(-f.size*1.9,-f.size*0.5);
+      ctx.closePath();
+      ctx.fillStyle = f.type==='gold'? '#ffe89a' : '#ffc6a0';
+      ctx.fill();
+      // eye
+      ctx.beginPath();
+      ctx.fillStyle = '#101820';
+      ctx.arc(f.size*0.6,-f.size*0.1, f.size*0.12, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBackground(){
+    // bubbles + seabed
+    ctx.clearRect(0,0,W,H);
+    for(let i=0;i<6;i++){
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.arc((i*180+ (Date.now()/60+i*50)%W)%W, (Date.now()/20+i*80)%H, 6, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(20,40,60,0.6)';
+    ctx.fillRect(0,H-60,W,60);
+    ctx.fillStyle = 'rgba(40,70,90,0.8)';
+    for(let i=0;i<W;i+=20){
+      const h = 50+10*Math.sin(i/60 + Date.now()/900);
+      ctx.fillRect(i,H-h,18,h);
+    }
+  }
+
+  function spawnParticles(x,y,good=true){
+    for(let i=0;i<8;i++){
+      particles.push({x,y, vx:rand(-1.5,1.5), vy:rand(-2,0), a:1, good});
+    }
+  }
+
+  function drawParticles(){
+    particles = particles.filter(p=>p.a>0.05);
+    particles.forEach(p=>{
+      p.x += p.vx; p.y += p.vy; p.vy += 0.03; p.a *= 0.96;
+      ctx.fillStyle = p.good? `rgba(123,211,137,${p.a})` : `rgba(255,120,120,${p.a})`;
+      ctx.fillRect(p.x, p.y, 3, 3);
+    })
+  }
+
+  function step(ts){
+    if(!running){return}
+    const dt = (ts - last)||16; last = ts;
+    drawBackground();
+
+    // spawn new fish occasionally
+    if(Math.random()<0.03) spawnFish();
+
+    // update & draw fish
+    fish.forEach(f=>{
+      f.x += f.dir * f.speed * (dt/1.6);
+    });
+    fish = fish.filter(f=> f.x>-100 && f.x<W+100 && !f.hit);
+    fish.forEach(drawFish);
+
+    drawParticles();
+
+    requestAnimationFrame(step);
+  }
+
+  function worldPosFromEvent(e){
+    const rect = canvas.getBoundingClientRect();
+    // account for CSS scaling
+    const scaleX = rect.width / W;
+    const scaleY = rect.height / H;
+    const x = (e.clientX - rect.left) / scaleX;
+    const y = (e.clientY - rect.top) / scaleY;
+    return {x,y}
+  }
+
+  canvas.addEventListener('pointerdown', (e)=>{
+    if(!running) return;
+    const p = worldPosFromEvent(e);
+    let hit = false;
+    for(const f of fish){
+      const dx = p.x - f.x, dy = p.y - f.y;
+      const rx = f.size*1.2, ry = f.type==='jelly'? f.size*0.7 : f.size*0.7;
+      if((dx*dx)/(rx*rx) + (dy*dy)/(ry*ry) <= 1){
+        f.hit = true; hit = true;
+        let delta = 1;
+        if(f.type==='gold') delta = 5;
+        if(f.type==='jelly') delta = -2;
+        score += delta; score = Math.max(score,0);
+        scoreEl.textContent = score;
+        spawnParticles(f.x,f.y, delta>0);
+        break;
+      }
+    }
+    if(!hit){
+      // small miss feedback
+      spawnParticles(p.x,p.y,false);
+    }
+  });
+
+  function start(){
+    score = 0; scoreEl.textContent = score;
+    timeLeft = 30; timeEl.textContent = timeLeft;
+    fish = []; particles = [];
+    startUI.style.display = 'none'; endUI.style.display = 'none'; howUI.style.display='none';
+    running = true; last = 0; countdown(); requestAnimationFrame(step);
+  }
+
+  function end(){
+    running = false;
+    finalScore.textContent = score;
+    best = Math.max(best, score); localStorage.setItem('lago_fish_best', best);
+    bestEl.textContent = best; finalBest.textContent = best;
+    const url = new URL(location.href);
+    shareLink.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent('I scored '+score+' in Lago Fishing!')}\u0026url=${encodeURIComponent(url.href)}`;
+    endUI.style.display = 'grid';
+  }
+
+  function countdown(){
+    if(!running) return;
+    timeEl.textContent = timeLeft;
+    if(timeLeft<=0){ end(); return; }
+    timeLeft--; setTimeout(countdown,1000);
+  }
+
+  playBtns.forEach(b=>b.addEventListener('click', start));
+  howBtn.addEventListener('click', ()=>{howUI.style.display='grid'; startUI.style.display='none'});
+  closeHow.addEventListener('click', ()=>{howUI.style.display='none'; startUI.style.display='grid'});
+  againBtn.addEventListener('click', start);
+})();
+</script>
+</body>
+</html>
