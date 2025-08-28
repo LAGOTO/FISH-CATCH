@@ -6,49 +6,77 @@
   <title>Играй – Късмет за улова</title>
   <style>
     :root{
-      --sea1:#0c2747; --sea2:#144a7a; --sky1:#87cefa; --sky2:#cfeaff; --foam:#d6ecff; --ui:#ffffff; --accent:#7bd389; --muted:#cfe2f5;
+      --sea1:#0c2747; --sea2:#144a7a; --sky2:#cfeaff; --ui:#ffffff; --accent:#7bd389; --muted:#cfe2f5;
+      --glass: rgba(255,255,255,.12); --glass-b: rgba(255,255,255,.18);
     }
     html,body{height:100%;margin:0}
-    body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Helvetica, Arial, sans-serif; background:linear-gradient(#071426,#0a1b2a); color:var(--ui); display:flex; align-items:center; justify-content:center}
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;
+      background:linear-gradient(#071426,#0a1b2a); color:var(--ui);
+      display:flex; align-items:center; justify-content:center
+    }
 
-    .game{width:min(1100px,96vw); aspect-ratio:16/9; position:relative; border-radius:20px; overflow:hidden; box-shadow:0 18px 50px rgba(0,0,0,.55); background:radial-gradient(1200px 600px at 50% -40%, var(--sky2), var(--sea1) 60%)}
-    header{position:absolute; left:12px; right:12px; top:12px; display:flex; justify-content:space-between; align-items:center; z-index:5}
-    .brand{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.4px}
+    /* важен фикс: фиксирана височина за стабилен преглед */
+    .game{
+      width:min(1100px,96vw);
+      height:min(680px,78vh);
+      position:relative; border-radius:20px; overflow:hidden;
+      box-shadow:0 18px 50px rgba(0,0,0,.55);
+      background:radial-gradient(1200px 600px at 50% -40%, var(--sky2), var(--sea1) 60%);
+    }
+
+    header{position:absolute; left:12px; right:12px; top:12px; display:flex; justify-content:space-between; align-items:center; z-index:8}
+    .brand{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.3px}
     .dot{width:12px; height:12px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent)}
-    .pill{backdrop-filter: blur(6px); background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); padding:6px 10px; border-radius:999px; font-weight:700}
+    .pill{backdrop-filter: blur(6px); background:var(--glass); border:1px solid var(--glass-b); padding:6px 10px; border-radius:999px; font-weight:700}
 
-    /* Lake drawing */
     .lake{position:absolute; inset:0;}
     .water{position:absolute; left:0; right:0; top:20%; bottom:0; background:linear-gradient(180deg, var(--sea2), var(--sea1));}
-    .shore{position:absolute; left:0; right:0; bottom:0; height:14%; background:linear-gradient(180deg,#3c2b1a,#24190f);} 
+    .shore{position:absolute; left:0; right:0; bottom:0; height:14%; background:linear-gradient(180deg,#3c2b1a,#24190f);}
     .ripples{position:absolute; inset:0; pointer-events:none;}
 
-    /* Grid */
-    .grid{position:absolute; left:6%; right:6%; top:22%; bottom:16%; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:10px}
-    .cell{position:relative; border-radius:12px; outline:1px dashed rgba(255,255,255,.18); background:rgba(255,255,255,.05); cursor:pointer; transition:transform .08s ease, background .15s ease}
-    .cell:hover{transform:translateY(-2px); background:rgba(255,255,255,.08)}
+    /* гридът е центриран и над фона */
+    .grid{
+      position:absolute; left:6%; right:6%; top:18%; bottom:18%;
+      display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr);
+      gap:12px; z-index:6;
+    }
+    .grid.locked{ pointer-events:none; opacity:0.9; }
+
+    /* клетки – видими, с номера */
+    .cell{
+      position:relative; border-radius:12px;
+      outline:2px dashed rgba(255,255,255,.55);
+      background:rgba(255,255,255,.08);
+      cursor:pointer; transition:transform .08s ease, background .15s ease;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .cell:hover{transform:translateY(-2px); background:rgba(255,255,255,.16)}
     .cell span{position:absolute; left:8px; top:6px; font-size:12px; color:var(--muted)}
+    .cell b{font-size:22px; color:#ffffff; opacity:.9}
 
-    /* Overlays */
-    .overlay{position:absolute; inset:0; display:grid; place-items:center; z-index:10}
-    .card{background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.18); border-radius:16px; padding:22px; max-width:640px}
-    .title{margin:0 0 8px; font-size:clamp(20px,3.4vw,30px)}
-    .sub{margin:0 0 16px; color:#e5f1ff}
-    .row{display:flex; gap:10px; flex-wrap:wrap}
-    button{cursor:pointer; border:0; border-radius:12px; padding:10px 14px; font-weight:800}
-    .btn{background:var(--accent)}
-    .btn-ghost{background:transparent; color:#fff; outline:1px solid rgba(255,255,255,.35)}
-
-    /* Result sheet */
-    .result{position:absolute; right:12px; bottom:12px; z-index:9;}
-    .sheet{background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.18); border-radius:16px; padding:14px 16px; min-width:260px}
-    .sheet h3{margin:0 0 8px}
-    .kv{display:grid; grid-template-columns: auto 1fr; gap:6px 12px; font-size:14px}
-    .kv div{opacity:.95}
-
-    /* Casting ripple */
+    /* сплаш + спинър */
     .splash{position:absolute; width:8px; height:8px; border-radius:50%; background:#fff; opacity:.9; pointer-events:none; transform:translate(-50%,-50%); animation:splash 1.2s ease-out forwards}
     @keyframes splash{ 0%{box-shadow:0 0 0 0 rgba(255,255,255,.6);} 100%{box-shadow:0 0 0 30px rgba(255,255,255,0); opacity:0} }
+
+    .spinner{position:absolute; transform:translate(-50%,-50%); width:28px; height:28px; border-radius:50%;
+      border:3px solid rgba(255,255,255,.35); border-top-color:#fff; animation:spin 0.8s linear infinite; z-index:14}
+    @keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+    /* балон „поп“ до зоната */
+    .bubble{
+      position:absolute; transform:translate(-50%,-100%) scale(.92); transform-origin:50% 100%;
+      background:rgba(0,0,0,.35); border:1px solid var(--glass-b); border-radius:14px;
+      padding:10px 12px; min-width:220px; z-index:15; opacity:0; animation:pop .18s ease-out forwards;
+    }
+    .bubble::after{content:""; position:absolute; left:50%; bottom:-10px; transform:translateX(-50%); border:10px solid transparent; border-top-color:rgba(0,0,0,.35)}
+    .b-row{display:grid; grid-template-columns:auto 1fr; gap:6px 10px; font-size:14px}
+    .b-title{margin:0 0 6px; font-weight:800}
+    .b-actions{display:flex; gap:8px; margin-top:8px}
+    .btn{cursor:pointer; border:0; border-radius:10px; padding:6px 10px; font-weight:800}
+    .btn-primary{background:var(--accent)}
+    .btn-ghost{background:transparent; color:#fff; outline:1px solid rgba(255,255,255,.35)}
+    @keyframes pop{from{opacity:0; transform:translate(-50%,-100%) scale(.92)} to{opacity:1; transform:translate(-50%,-100%) scale(1)}}
 
     footer{position:absolute; inset:auto 12px 10px 12px; color:#d0e2f6; font-size:12px; display:flex; justify-content:space-between}
   </style>
@@ -56,8 +84,8 @@
 <body>
   <div class="game" id="game">
     <header>
-      <div class="brand"><span class="dot"></span> QR Късмет <b>HASWING</b></div>
-      <div class="pill">Заметни!</div>
+      <div class="brand"><span class="dot"></span> Lago • <b>HASWING</b></div>
+      <div class="pill">Хвърляй!</div>
     </header>
 
     <div class="lake">
@@ -67,215 +95,6 @@
       <div class="shore"></div>
     </div>
 
-    <div class="result" id="result" style="display:none">
-      <div class="sheet">
-        <h3 class="title" style="font-size:20px">Късметът ти днес</h3>
-        <div class="kv">
-          <div>Риба:</div><div id="r-fish">–</div>
-          <div>Тегло:</div><div id="r-weight">–</div>
-          <div>Дълбочина на кълването:</div><div id="r-depth">–</div>
-          <div>Време на чакане:</div><div id="r-wait">–</div>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <button class="btn" id="again">Играй пак</button>
-          <button class="btn-ghost" id="share">Сподели</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="overlay" id="start">
-      <div class="card">
-        <h1 class="title">Сканира QR кода? Добре дошъл!</h1>
-        <p class="sub">„Играй, за да видиш късмета си и каква риба ще хванеш.“
-          Избери зона за замятане (3×3 пред теб) и виж какво ще вземе стръвта.</p>
-        <div class="row">
-          <button class="btn" id="play">Старт</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="overlay" id="howCard" style="display:none">
-      <div class="card">
-        <h2 class="title">Как се играе</h2>
-        <ul style="line-height:1.55; margin:0 0 14px 18px">
-          <li>Избери една от <b>9‑те зони</b> пред теб (ляво/дясно, близо/средно/далеч).</li>
-          <li>Всяка зона има различен шанс за <b>костур</b>, <b>щука</b>, <b>бяла риба</b> или <b>сом</b>.</li>
-          <li>Ще получиш късмет: вид риба, <b>тегло</b>, <b>дълбочина на кълването</b> и <b>време на чакане</b>.</li>
-        </ul>
-        <div class="row">
-          <button class="btn" id="play2">Играй сега</button>
-          <button class="btn-ghost" id="closeHow">Затвори</button>
-        </div>
-      </div>
-    </div>
-
     <footer>
-      <div>©Lago.bg</div>
-    </footer>
-  </div>
-
-<script>
-(() => {
-  'use strict';
-  // Ensure DOM is ready even if this script is moved to <head>
-  window.addEventListener('DOMContentLoaded', init);
-
-  function init(){
-    // ===== Query elements (single scope) =====
-    const grid = document.getElementById('grid');
-    const ripples = document.getElementById('ripples');
-    const startUI = document.getElementById('start');
-    const howUI = document.getElementById('howCard');
-    const playBtns = [document.getElementById('play'), document.getElementById('play2')];
-    const howBtn = document.getElementById('how');
-    const closeHow = document.getElementById('closeHow');
-    const resultWrap = document.getElementById('result');
-    const rFish = document.getElementById('r-fish');
-    const rW = document.getElementById('r-weight');
-    const rD = document.getElementById('r-depth');
-    const rT = document.getElementById('r-wait');
-    const again = document.getElementById('again');
-    const share = document.getElementById('share');
-
-    // ===== Guard: if critical elements missing, abort gracefully =====
-    const required = {grid,ripples,startUI,howUI,playBtns,howBtn,closeHow,resultWrap,rFish,rW,rD,rT,again,share};
-    for(const [k,v] of Object.entries(required)){
-      if(v==null || (Array.isArray(v) && v.some(x=>x==null))){
-        console.error('QR Fish Luck – missing element:', k);
-        return; // avoid ReferenceErrors
-      }
-    }
-
-    // ===== Audio (inside same scope) =====
-    let actx;
-    const ctx = () => actx || (actx = new (window.AudioContext||window.webkitAudioContext)());
-    function ensureAudio(){ try{ const a=ctx(); if(a.state==='suspended') a.resume(); }catch(e){} }
-    function beep(freq=440, dur=120, type='sine', vol=0.2){
-      ensureAudio();
-      const a=ctx(); const o=a.createOscillator(); const g=a.createGain();
-      o.type=type; o.frequency.value=freq; g.gain.value=vol; o.connect(g); g.connect(a.destination);
-      const t=a.currentTime; o.start(t); o.stop(t+dur/1000);
-      g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001, t+dur/1000);
-    }
-    const playSplash = () => beep(220,90,'sine',0.08);
-    const playCatch = (f) => { const map={perch:520,pike:360,zander:300,catfish:180}; beep(map[f.id]||400,160,'triangle',0.15); };
-
-    // ===== Build 3x3 grid (near at bottom) =====
-    const rows=3, cols=3; let cells=[];
-    function build(){
-      grid.innerHTML=''; cells=[];
-      for(let r=0;r<rows;r++){
-        for(let c=0;c<cols;c++){
-          const cell=document.createElement('div'); cell.className='cell';
-          const lab=document.createElement('span');
-          const dist = r===2? 'близо' : r===1? 'средно' : 'далеч'; // bottom row is near
-          const col = c===0? 'ляво' : c===1? 'център' : 'дясно';
-          lab.textContent = `${dist} • ${col}`; cell.appendChild(lab);
-          cell.dataset.r=r; cell.dataset.c=c;
-          cell.addEventListener('click', ()=> cast(r,c,cell));
-          cells.push(cell); grid.appendChild(cell);
-        }
-      }
-    }
-
-    // ===== Species & probabilities =====
-    const species = [
-      {id:'perch',   name:'Костур',     emoji:'🐟', w:[0.1,1.2],  depth:[1.0,4.0], wait:[5,40]},
-      {id:'pike',    name:'Щука',       emoji:'🦈', w:[0.8,8.0],  depth:[0.5,2.5], wait:[10,60]},
-      {id:'zander',  name:'Бяла риба',  emoji:'🐠', w:[0.7,4.5],  depth:[2.0,8.0], wait:[15,120]},
-      {id:'catfish', name:'Сом',        emoji:'🐡', w:[2.0,30.0], depth:[3.0,10.0], wait:[30,180]}
-    ];
-
-    // far (top), mid, near (bottom) → [perch, pike, zander, catfish]
-    const distRowWeights = [
-      [0.25, 0.20, 0.45, 0.10], // far – повече бяла риба, по-рядък сом
-      [0.40, 0.30, 0.25, 0.05], // mid – повече костур, умерена щука
-      [0.55, 0.30, 0.12, 0.03]  // near – най-много костур, сом почти липсва
-    ];
-
-    // ===== Helpers =====
-    const rnd = (a,b) => Math.random()*(b-a)+a;
-    const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
-    function fmtWait(sec){ if(sec<60) return `${sec} сек`; const m=Math.floor(sec/60), s=sec%60; return s? `${m} мин ${s} сек` : `${m} мин`; }
-    function pickWeighted(arr){ const x=Math.random(); let acc=0; for(let i=0;i<arr.length;i++){ acc+=arr[i]; if(x<=acc) return i; } return arr.length-1; }
-
-    // ===== UI actions =====
-    function splash(x,y){
-      const s=document.createElement('div'); s.className='splash';
-      s.style.left = `${x + grid.offsetLeft}px`; s.style.top = `${y + grid.offsetTop}px`;
-      ripples.appendChild(s); setTimeout(()=>s.remove(), 1200);
-    }
-
-    function display(f, weight, depth, wait){
-      rFish.textContent = `${f.emoji} ${f.name}`;
-      rW.textContent = `${weight.toFixed(weight<1?2:1)} кг`;
-      rD.textContent = `${depth.toFixed(1)} м`;
-      rT.textContent = fmtWait(wait);
-      resultWrap.style.display='block';
-    }
-
-    function cast(r,c,cell){
-      // visual splash
-      const rect = cell.getBoundingClientRect();
-      const grect = grid.getBoundingClientRect();
-      const x = rect.left + rect.width/2 - grect.left;
-      const y = rect.top + rect.height/2 - grect.top;
-      splash(x,y); playSplash();
-
-      // choose fish by row probabilities
-      const fishId = pickWeighted(distRowWeights[r]);
-      const f = species[fishId];
-
-      // stats
-      const depthAdj = r===2? -0.6 : r===1? 0 : 0.6; // близо=по-плитко, далеч=по-дълбоко
-      const weight = rnd(f.w[0], f.w[1]);
-      const depth = clamp(rnd(f.depth[0], f.depth[1]) + depthAdj, 0.4, 12);
-      const wait = Math.round(rnd(f.wait[0], f.wait[1]));
-
-      // small trophy chance for bigger species
-      if(Math.random()<0.06){
-        const extra = rnd(1.08,1.25);
-        if(f.id==='pike' || f.id==='catfish'){
-          rFish.textContent = `${f.emoji} ${f.name} (трофей!)`;
-        }
-        display(f, weight*extra, depth, wait + 10);
-        playCatch(f);
-      } else {
-        display(f, weight, depth, wait);
-        playCatch(f);
-      }
-    }
-
-    // Buttons
-    playBtns.forEach(b=>b.addEventListener('click', ()=>{ startUI.style.display='none'; howUI.style.display='none'; build(); }));
-    howBtn.addEventListener('click', ()=>{ startUI.style.display='none'; howUI.style.display='grid'; });
-    closeHow.addEventListener('click', ()=>{ howUI.style.display='none'; startUI.style.display='grid'; });
-    again.addEventListener('click', ()=>{ resultWrap.style.display='none'; beep(440,80,'square',0.08); });
-    share.addEventListener('click', ()=>{
-      const text = `Късметът ми от Lago QR: ${rFish.textContent}, ${rW.textContent}, ${rD.textContent}, ${rT.textContent}!`;
-      const url = location.href;
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
-    });
-
-    // ===== Simple runtime tests (logged to console) =====
-    runTests();
-    function runTests(){
-      try{
-        // Elements present
-        const ids=['grid','ripples','start','howCard','play','play2','how','closeHow','result','r-fish','r-weight','r-depth','r-wait','again','share'];
-        const missing = ids.filter(id=>!document.getElementById(id));
-        console.assert(missing.length===0, 'Липсващи елементи:', missing);
-        // fmtWait formatting
-        console.assert(fmtWait(45)==='45 сек', 'fmtWait 45 сек');
-        console.assert(fmtWait(60)==='1 мин', 'fmtWait 60 сек');
-        console.assert(fmtWait(125)==='2 мин 5 сек', 'fmtWait 125 сек');
-        // Weighted pick returns a valid index
-        const idx = pickWeighted([0.5,0.3,0.2]);
-        console.assert(Number.isInteger(idx) && idx>=0 && idx<3, 'pickWeighted idx', idx);
-      }catch(e){ console.warn('Тестовете срещнаха грешка:', e); }
-    }
-  }
-})();
-</script>
-</body>
-</html>
+      <div>Съвет: близките квадрати са по-плитки; далечните – по-дълбоки.</div>
+      <div>© Lag
